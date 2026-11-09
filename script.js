@@ -5,6 +5,8 @@
 
 // --- KHỞI TẠO BIẾN TRẠNG THÁI ---
 const STORAGE_KEY = 'qr_counter_data_v1';
+const PREFERRED_CAM_KEY = 'qr_counter_preferred_camera_id';
+const CAM_PERMISSION_GRANTED_KEY = 'qr_counter_cam_permission_granted';
 let qrRecords = {}; // Format: { "nội dung QR": số lượng }
 let html5QrCode = null;
 let isScanning = false;
@@ -209,28 +211,15 @@ async function closeScannerFullscreen(pauseOnly = true) {
     try {
       const state = html5QrCode.getState();
       if (state === 2) { // 2 = SCANNING
-        await html5QrCode.pause(true); // Chỉ pause quét mã để giữ nguyên quyền Camera
+        await html5QrCode.pause(true); // Giữ nguyên luồng camera để tuyệt đối không hỏi lại quyền
       }
     } catch (e) {
       console.warn('Lỗi khi pause camera:', e);
     }
   }
 
-  // Nếu người dùng chủ động bấm dấu X thoát hẳn thì mới tắt stream
-  if (!pauseOnly && activeMediaStream) {
-    activeMediaStream.getTracks().forEach(t => t.stop());
-    activeMediaStream = null;
-    if (html5QrCode) {
-      try {
-        await html5QrCode.stop();
-        await html5QrCode.clear();
-      } catch (e) {
-        console.warn('Lỗi stop hẳn camera:', e);
-      }
-      html5QrCode = null;
-    }
-  }
-
+  // Khi đóng bằng nút X hay chuyển tab: chỉ pause, tuyệt đối KHÔNG destroy stream
+  // Việc giữ stream / instance giúp trình duyệt không bao giờ phải cấp lại quyền media
   isScanning = false;
   document.getElementById('cameraFullscreenModal').classList.add('d-none');
   hideCamAlert();
@@ -250,15 +239,18 @@ async function openScannerFullscreen() {
     }, 1000);
   }
 
-  // Nếu camera đã được cấp quyền và đang pause -> resume lập tức không bao giờ hỏi lại
-  if (html5QrCode && html5QrCode.getState() === 3) { // 3 = PAUSED
+  // 1. TỐI ƯU CỰC ĐỘ: Nếu camera đang ở trạng thái PAUSED -> resume ngay lập tức (0ms trễ, 0 popup hỏi quyền)
+  if (html5QrCode) {
     try {
-      html5QrCode.resume();
-      isScanning = true;
-      setTimeout(enforceVideoPlayback, 100);
-      return;
+      const state = html5QrCode.getState();
+      if (state === 3) { // 3 = PAUSED
+        html5QrCode.resume();
+        isScanning = true;
+        setTimeout(enforceVideoPlayback, 100);
+        return;
+      }
     } catch (e) {
-      console.warn('Không thể resume, khởi động lại luồng:', e);
+      console.warn('Không thể resume, thử khôi phục:', e);
     }
   }
 
@@ -267,7 +259,7 @@ async function openScannerFullscreen() {
       throw new Error('Thư viện quét mã chưa được tải. Hãy kiểm tra kết nối mạng.');
     }
 
-    // Dọn dẹp an toàn trước khi khởi tạo
+    // Dọn dẹp phiên quét cũ nếu đã bị stop trước đó
     if (html5QrCode) {
       try {
         const state = html5QrCode.getState();
@@ -284,25 +276,51 @@ async function openScannerFullscreen() {
     html5QrCode = new Html5Qrcode("reader");
 
     const config = {
-      fps: 25,
-      qrbox: { width: 250, height: 250 }
+      fps: 30, // Tốc độ xử lý khung hình nhận diện QR cao và mượt mà
+      qrbox: { width: 260, height: 260 },
+      videoConstraints: {
+        facingMode: currentCameraFacing,
+        width: { ideal: 1920, max: 2560 }, // Độ nét cao Full HD 1080p
+        height: { ideal: 1080, max: 1440 },
+        frameRate: { ideal: 60, min: 30 } // Yêu cầu 60 FPS siêu mượt
+      }
     };
 
-    // Khởi động trực tiếp
     let started = false;
-    try {
-      await html5QrCode.start(
-        { facingMode: currentCameraFacing },
-        config,
-        (decodedText) => handleScanSuccess(decodedText),
-        () => { }
-      );
-      started = true;
-    } catch (facingErr) {
-      console.warn('Thử dò camera theo ID phần cứng:', facingErr);
+
+    // 2. TỐI ƯU GHI NHỚ CAMERA PHẦN CỨNG ĐÃ TỪNG ĐƯỢC CẤP QUYỀN
+    const savedCameraId = localStorage.getItem(PREFERRED_CAM_KEY);
+    if (savedCameraId) {
+      try {
+        await html5QrCode.start(
+          savedCameraId,
+          config,
+          (decodedText) => handleScanSuccess(decodedText),
+          () => { }
+        );
+        started = true;
+      } catch (savedErr) {
+        console.warn('Không mở được camera đã lưu trước đó, chuyển sang dò camera:', savedErr);
+        localStorage.removeItem(PREFERRED_CAM_KEY);
+      }
     }
 
-    // Dò ID phần cứng nếu thiết bị kén facingMode
+    // 3. Nếu chưa lưu hoặc camera lưu không hợp lệ, khởi động theo facingMode
+    if (!started) {
+      try {
+        await html5QrCode.start(
+          { facingMode: currentCameraFacing },
+          config,
+          (decodedText) => handleScanSuccess(decodedText),
+          () => { }
+        );
+        started = true;
+      } catch (facingErr) {
+        console.warn('Thử dò camera theo ID phần cứng:', facingErr);
+      }
+    }
+
+    // 4. Fallback dò danh sách camera phần cứng và ghi nhớ ID để lần sau mở thẳng
     if (!started) {
       const devices = await Html5Qrcode.getCameras();
       if (devices && devices.length > 0) {
@@ -323,12 +341,29 @@ async function openScannerFullscreen() {
           (decodedText) => handleScanSuccess(decodedText),
           () => { }
         );
+        
+        // Lưu camera này vào localStorage để sau này không bị quét hay dò lại
+        localStorage.setItem(PREFERRED_CAM_KEY, selectedCam);
         started = true;
       } else {
         throw new Error('Không tìm thấy thiết bị camera nào trên máy.');
       }
     }
 
+    // Áp dụng lấy nét liên tục (continuous autofocus) nếu thiết bị hỗ trợ
+    try {
+      if (html5QrCode && typeof html5QrCode.applyVideoConstraints === 'function') {
+        await html5QrCode.applyVideoConstraints({
+          focusMode: 'continuous',
+          advanced: [{ focusMode: 'continuous' }]
+        });
+      }
+    } catch (focusErr) {
+      console.warn('Thiết bị không hỗ trợ focusMode tùy chỉnh:', focusErr);
+    }
+
+    // Đánh dấu quyền đã được cho phép thành công vào localStorage
+    localStorage.setItem(CAM_PERMISSION_GRANTED_KEY, 'true');
     isScanning = true;
 
     // Giám sát và ép hiển thị video trên iOS WebKit/PWA ngay sau khi start
@@ -337,18 +372,16 @@ async function openScannerFullscreen() {
     setTimeout(enforceVideoPlayback, 1000);
 
   } catch (err) {
-    console.error('Lỗi khi mở camera trên iOS/PWA:', err);
+    console.error('Lỗi khi mở camera:', err);
     isScanning = false;
     updateDebugInfo(err.message || err);
 
     let msg = '<strong>Không thể mở Camera:</strong><br>';
     if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-      msg += 'Quyền Camera trên iPhone chưa được cài đặt "Luôn cho phép".<br><br>' +
-             '👉 <strong>Cài đặt 1 lần duy nhất để không bao giờ hỏi lại:</strong><br>' +
-             '1. Vào <strong>Cài đặt (Settings)</strong> trên iPhone.<br>' +
-             '2. Kéo xuống chọn <strong>Safari</strong>.<br>' +
-             '3. Tìm mục <strong>Camera</strong> -> Đổi thành <strong>Cho phép (Allow)</strong>.<br>' +
-             'Xong! Từ nay iPhone sẽ không bao giờ hiện hộp thoại hỏi quyền nữa.';
+      msg += 'Quyền Camera chưa được cấp "Luôn cho phép".<br><br>' +
+             '👉 <strong>Cài đặt 1 lần để không bao giờ hỏi lại:</strong><br>' +
+             '- <strong>Trên iPhone/iPad:</strong> Vào <i>Cài đặt > Safari > Camera</i> > chọn <b>Cho phép (Allow)</b>.<br>' +
+             '- <strong>Trên Android/Chrome:</strong> Bấm vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ > <i>Quyền / Quyền trang web > Máy ảnh</i> > chọn <b>Cho phép</b>.';
     } else {
       msg += (err.message || err);
     }
@@ -358,8 +391,17 @@ async function openScannerFullscreen() {
 
 async function switchCamera() {
   currentCameraFacing = currentCameraFacing === 'environment' ? 'user' : 'environment';
-  if (isScanning) {
-    await closeScannerFullscreen();
+  localStorage.removeItem(PREFERRED_CAM_KEY); // Xóa camera cũ để dò camera góc mới
+  if (isScanning || (html5QrCode && html5QrCode.getState() === 3)) {
+    if (html5QrCode) {
+      try {
+        await html5QrCode.stop();
+        await html5QrCode.clear();
+      } catch (e) {
+        console.warn(e);
+      }
+      html5QrCode = null;
+    }
     await openScannerFullscreen();
   }
 }
