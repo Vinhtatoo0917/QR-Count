@@ -128,8 +128,83 @@ function hideCamAlert() {
 
 // Biến lưu giữ video stream đang chạy liên tục để không bao giờ bị hỏi lại quyền
 let activeMediaStream = null;
+let debugInterval = null;
+
+// --- HÀM CẬP NHẬT CHẨN ĐOÁN CAMERA (DIAGNOSTIC / DEBUG) ---
+function updateDebugInfo(extraError = null) {
+  const contentEl = document.getElementById('debugContent');
+  if (!contentEl) return;
+
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  const userAgent = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  let streamInfo = 'Không có stream';
+  let trackInfo = 'Không có track';
+  let videoEl = document.querySelector('#reader video');
+
+  if (videoEl && videoEl.srcObject) {
+    const stream = videoEl.srcObject;
+    const tracks = stream.getVideoTracks();
+    if (tracks.length > 0) {
+      const t = tracks[0];
+      const settings = t.getSettings ? t.getSettings() : {};
+      streamInfo = `Stream active: ${stream.active}, Tracks: ${tracks.length}`;
+      trackInfo = `Track readyState: ${t.readyState}, enabled: ${t.enabled}, muted: ${t.muted}, label: ${t.label || 'N/A'}\nSettings: ${settings.width || 0}x${settings.height || 0} @ ${settings.frameRate || 0}fps`;
+    }
+  }
+
+  let videoDetail = 'Chưa tìm thấy thẻ <video>';
+  if (videoEl) {
+    videoDetail = `Video readyState: ${videoEl.readyState} (HAVE_ENOUGH_DATA=${videoEl.HAVE_ENOUGH_DATA})\n` +
+                  `Kích thước: ${videoEl.videoWidth}x${videoEl.videoHeight} (client: ${videoEl.clientWidth}x${videoEl.clientHeight})\n` +
+                  `Paused: ${videoEl.paused}, Muted: ${videoEl.muted}, PlaysInline: ${videoEl.playsInline || videoEl.getAttribute('playsinline')}\n` +
+                  `CSS display: ${window.getComputedStyle(videoEl).display}, visibility: ${window.getComputedStyle(videoEl).visibility}`;
+  }
+
+  contentEl.textContent = 
+    `📱 MÔI TRƯỜNG:\n` +
+    `- PWA Standalone: ${isStandalone}\n` +
+    `- iOS Device: ${isIOS}\n` +
+    `- HTTPS / Secure: ${window.isSecureContext}\n\n` +
+    `🎥 STREAM & TRACK:\n` +
+    `- ${streamInfo}\n` +
+    `- ${trackInfo}\n\n` +
+    `📺 HTML VIDEO ELEMENT:\n` +
+    `${videoDetail}\n\n` +
+    (extraError ? `⚠️ LỖI GẦN NHẤT:\n${extraError}` : `✅ Không có lỗi`);
+}
+
+// Hàm đảm bảo thẻ video luôn có đủ playsinline, muted, autoplay và được play()
+function enforceVideoPlayback() {
+  const video = document.querySelector('#reader video');
+  if (!video) return;
+
+  // Bắt buộc các thuộc tính iOS WebKit yêu cầu
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
+  video.setAttribute('muted', 'true');
+  video.setAttribute('autoplay', 'true');
+  video.muted = true;
+  video.playsInline = true;
+
+  // Đảm bảo video đang chạy, nếu bị paused thì play lại
+  if (video.paused && video.srcObject) {
+    video.play().catch(e => {
+      console.warn('Lỗi khi ép video.play():', e);
+      updateDebugInfo('Lỗi video.play(): ' + (e.message || e));
+    });
+  }
+
+  updateDebugInfo();
+}
 
 async function closeScannerFullscreen(pauseOnly = true) {
+  if (debugInterval) {
+    clearInterval(debugInterval);
+    debugInterval = null;
+  }
+
   if (html5QrCode) {
     try {
       const state = html5QrCode.getState();
@@ -168,11 +243,19 @@ async function openScannerFullscreen() {
   const modal = document.getElementById('cameraFullscreenModal');
   modal.classList.remove('d-none');
 
+  // Khởi động debug polling
+  if (!debugInterval) {
+    debugInterval = setInterval(() => {
+      enforceVideoPlayback();
+    }, 1000);
+  }
+
   // Nếu camera đã được cấp quyền và đang pause -> resume lập tức không bao giờ hỏi lại
   if (html5QrCode && html5QrCode.getState() === 3) { // 3 = PAUSED
     try {
       html5QrCode.resume();
       isScanning = true;
+      setTimeout(enforceVideoPlayback, 100);
       return;
     } catch (e) {
       console.warn('Không thể resume, khởi động lại luồng:', e);
@@ -205,7 +288,8 @@ async function openScannerFullscreen() {
       qrbox: { width: 250, height: 250 }
     };
 
-    // Khởi động trực tiếp - Trình duyệt sẽ nhớ quyền vĩnh viễn
+    // Khởi động trực tiếp
+    let started = false;
     try {
       await html5QrCode.start(
         { facingMode: currentCameraFacing },
@@ -213,40 +297,50 @@ async function openScannerFullscreen() {
         (decodedText) => handleScanSuccess(decodedText),
         () => { }
       );
-      isScanning = true;
-      return;
+      started = true;
     } catch (facingErr) {
       console.warn('Thử dò camera theo ID phần cứng:', facingErr);
     }
 
     // Dò ID phần cứng nếu thiết bị kén facingMode
-    const devices = await Html5Qrcode.getCameras();
-    if (devices && devices.length > 0) {
-      let selectedCam = devices[0].id;
-      const backCam = devices.find(d => 
-        d.label.toLowerCase().includes('back') || 
-        d.label.toLowerCase().includes('sau') || 
-        d.label.toLowerCase().includes('environment') ||
-        d.label.toLowerCase().includes('rear')
-      );
-      if (backCam) {
-        selectedCam = backCam.id;
-      }
+    if (!started) {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        let selectedCam = devices[0].id;
+        const backCam = devices.find(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('sau') || 
+          d.label.toLowerCase().includes('environment') ||
+          d.label.toLowerCase().includes('rear')
+        );
+        if (backCam) {
+          selectedCam = backCam.id;
+        }
 
-      await html5QrCode.start(
-        selectedCam,
-        config,
-        (decodedText) => handleScanSuccess(decodedText),
-        () => { }
-      );
-      isScanning = true;
-    } else {
-      throw new Error('Không tìm thấy thiết bị camera nào trên máy.');
+        await html5QrCode.start(
+          selectedCam,
+          config,
+          (decodedText) => handleScanSuccess(decodedText),
+          () => { }
+        );
+        started = true;
+      } else {
+        throw new Error('Không tìm thấy thiết bị camera nào trên máy.');
+      }
     }
+
+    isScanning = true;
+
+    // Giám sát và ép hiển thị video trên iOS WebKit/PWA ngay sau khi start
+    setTimeout(enforceVideoPlayback, 100);
+    setTimeout(enforceVideoPlayback, 400);
+    setTimeout(enforceVideoPlayback, 1000);
 
   } catch (err) {
     console.error('Lỗi khi mở camera trên iOS/PWA:', err);
     isScanning = false;
+    updateDebugInfo(err.message || err);
+
     let msg = '<strong>Không thể mở Camera:</strong><br>';
     if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
       msg += 'Quyền Camera trên iPhone chưa được cài đặt "Luôn cho phép".<br><br>' +
@@ -740,6 +834,44 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnSaveEdit').addEventListener('click', saveEditModal);
   editModal.addEventListener('click', (e) => {
     if (e.target === editModal) closeEditModal();
+  });
+
+  // Bật / Tắt bảng Debug
+  const btnToggleDebug = document.getElementById('btnToggleDebug');
+  const btnCloseDebug = document.getElementById('btnCloseDebug');
+  const debugPanel = document.getElementById('debugPanel');
+
+  if (btnToggleDebug && debugPanel) {
+    btnToggleDebug.addEventListener('click', () => {
+      debugPanel.classList.toggle('d-none');
+      updateDebugInfo();
+    });
+  }
+  if (btnCloseDebug && debugPanel) {
+    btnCloseDebug.addEventListener('click', () => {
+      debugPanel.classList.add('d-none');
+    });
+  }
+
+  // Quản lý vòng đời trang (Page Lifecycle): visibilitychange, pageshow, pagehide
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (isScanning) {
+        closeScannerFullscreen(true);
+      }
+    } else {
+      enforceVideoPlayback();
+    }
+  });
+
+  window.addEventListener('pageshow', () => {
+    enforceVideoPlayback();
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (isScanning) {
+      closeScannerFullscreen(false);
+    }
   });
 
   // Đăng ký Service Worker cho Progressive Web App (PWA)

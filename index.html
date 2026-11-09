@@ -190,6 +190,11 @@
       </svg>
     </button>
 
+    <!-- Nút bật/tắt Debug -->
+    <button id="btnToggleDebug" class="btn-debug-toggle" title="Xem thông tin kỹ thuật camera">
+      🐞 Debug
+    </button>
+
     <!-- Khung camera toàn màn hình -->
     <div class="fullscreen-camera-body">
       <div id="reader"></div>
@@ -199,6 +204,15 @@
         <div class="aim-reticle"></div>
         <p class="aim-text">Đặt mã QR vào giữa khung hình</p>
       </div>
+    </div>
+
+    <!-- Bảng thông tin chẩn đoán kỹ thuật camera (Ẩn mặc định, bật khi nhấn Debug) -->
+    <div id="debugPanel" class="debug-panel d-none">
+      <div class="debug-header">
+        <strong>Chẩn đoán Camera (Diagnostic)</strong>
+        <button id="btnCloseDebug" class="btn-debug-close">&times;</button>
+      </div>
+      <div class="debug-content" id="debugContent">Đang lấy dữ liệu...</div>
     </div>
 
     <!-- Thông báo lỗi camera nếu có -->

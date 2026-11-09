@@ -233,6 +233,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background-color: #000000;
 }
 
 #reader {
@@ -244,13 +245,18 @@ body {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  position: relative;
+  z-index: 10;
 }
 
 #reader video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
-  transform: none !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  display: block !important;
+  background-color: transparent !important;
 }
 
 /* Nút thoát X to rõ ở góc */
@@ -295,7 +301,23 @@ body {
   z-index: 100001;
 }
 
-/* Khung ngắm ảo trên camera */
+/* Nút Debug */
+.btn-debug-toggle {
+  position: absolute;
+  top: 24px;
+  left: 76px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #38bdf8;
+  border: 1px solid #0284c7;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 100001;
+}
+
+/* Khung ngắm ảo trên camera - Sửa triệt để bug box-shadow GPU trên iOS */
 .scanner-aim-guide {
   position: absolute;
   pointer-events: none;
@@ -304,7 +326,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  z-index: 100000;
+  z-index: 50;
 }
 
 .aim-reticle {
@@ -312,7 +334,8 @@ body {
   height: 250px;
   border: 3px solid #3b82f6;
   border-radius: 16px;
-  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
+  background: transparent;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
 }
 
 .aim-text {
@@ -322,6 +345,51 @@ body {
   padding: 6px 14px;
   border-radius: 20px;
   font-weight: 500;
+}
+
+/* Bảng Debug Chẩn đoán kỹ thuật */
+.debug-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  right: 12px;
+  max-height: 45vh;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid #38bdf8;
+  border-radius: 10px;
+  color: #f1f5f9;
+  z-index: 100002;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #334155;
+  font-size: 0.82rem;
+  color: #38bdf8;
+}
+
+.btn-debug-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.debug-content {
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .fullscreen-alert {
