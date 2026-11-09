@@ -7,6 +7,17 @@
   <title>Hệ Thống Quét Mã QR & Đếm Số Lượng</title>
   <meta name="description" content="Website quét mã QR và thống kê số lượng tự động, lưu trữ trên trình duyệt.">
   <link rel="stylesheet" href="style.css">
+
+  <!-- Cấu hình Progressive Web App (PWA) để cài như ứng dụng độc lập trên iOS và Android -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  
+  <!-- Cấu hình riêng cho iPhone / iPad (iOS Standalone) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="QR Count">
+  <link rel="apple-touch-icon" href="icon.svg">
+
   <!-- Thư viện quét mã QR siêu nhẹ -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>

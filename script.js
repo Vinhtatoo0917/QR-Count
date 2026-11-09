@@ -695,4 +695,11 @@ document.addEventListener('DOMContentLoaded', () => {
   editModal.addEventListener('click', (e) => {
     if (e.target === editModal) closeEditModal();
   });
+
+  // Đăng ký Service Worker cho Progressive Web App (PWA)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('SW registration failed:', err);
+    });
+  }
 });
