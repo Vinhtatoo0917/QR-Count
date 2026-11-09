@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hệ Thống Quét Mã QR & Đếm Số Lượng</title>
+  <meta name="description" content="Website quét mã QR và thống kê số lượng tự động, lưu trữ trên trình duyệt, không cần backend.">
+  <link rel="stylesheet" href="style.css">
+  <!-- Thư viện quét mã QR siêu nhẹ, hoạt động ổn định trên iOS, Android và PC -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+          <path d="M10 7h4v4h-4z"></path>
+          <path d="M7 17h.01M17 17h.01"></path>
+        </svg>
+        <h1>QR Counter</h1>
+      </div>
+      <p class="subtitle">Quét mã QR và tự động thống kê số lượng</p>
+    </header>
+
+    <!-- Thống kê tổng quan -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Tổng số loại mã</span>
+        <span class="stat-value" id="totalTypes">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Tổng lượt quét</span>
+        <span class="stat-value highlight" id="totalScans">0</span>
+      </div>
+    </section>
+
+    <!-- Vùng Camera & Quét mã QR -->
+    <section class="scanner-section">
+      <div class="scanner-header">
+        <h2>Camera Quét Mã</h2>
+        <div class="scanner-status" id="scanStatus">Sẵn sàng</div>
+      </div>
+
+      <!-- Khung hiển thị camera -->
+      <div class="camera-wrapper">
+        <div id="reader"></div>
+        <div class="camera-placeholder" id="cameraPlaceholder">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <p>Nhấn "Bắt đầu quét" để kích hoạt camera</p>
+        </div>
+      </div>
+
+      <!-- Thông báo kết quả quét gần nhất -->
+      <div class="recent-scan-box" id="recentScanBox">
+        <span class="recent-label">Mã vừa quét:</span>
+        <code class="recent-code" id="recentScanCode">-</code>
+        <span class="recent-badge" id="recentScanBadge"></span>
+      </div>
+
+      <!-- Nút điều khiển Scanner -->
+      <div class="controls-row">
+        <button id="btnStartScan" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Bắt đầu quét
+        </button>
+        <button id="btnStopScan" class="btn btn-secondary" disabled>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+          Dừng quét
+        </button>
+        <button id="btnSwitchCam" class="btn btn-outline" title="Chuyển Camera Trước/Sau">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 7h-3a2 2 0 0 1-2-2V3"></path>
+            <path d="M4 17h3a2 2 0 0 1 2 2v2"></path>
+            <path d="M16 21l4-4-4-4"></path>
+            <path d="M8 3l-4 4 4 4"></path>
+          </svg>
+          Đổi Camera
+        </button>
+        <label class="sound-toggle" title="Bật/Tắt âm báo khi quét thành công">
+          <input type="checkbox" id="chkSound" checked>
+          <span>Âm báo</span>
+        </label>
+      </div>
+
+      <!-- Hộp thông báo lỗi/hướng dẫn camera -->
+      <div id="camAlert" class="alert-box d-none"></div>
+    </section>
+
+    <!-- Danh sách & Quản lý dữ liệu -->
+    <section class="data-section">
+      <div class="data-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Tìm kiếm nội dung mã QR...">
+          <button id="btnClearSearch" class="btn-clear d-none">&times;</button>
+        </div>
+
+        <div class="action-buttons">
+          <button id="btnExportCSV" class="btn btn-action" title="Xuất file CSV cho Excel">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Xuất CSV (Excel)
+          </button>
+          <button id="btnExportJSON" class="btn btn-action" title="Sao lưu dữ liệu JSON">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Sao lưu JSON
+          </button>
+          <button id="btnImportJSON" class="btn btn-action" title="Khôi phục dữ liệu từ JSON">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Nhập JSON
+          </button>
+          <input type="file" id="fileInputJSON" accept=".json" class="d-none">
+          <button id="btnClearAll" class="btn btn-danger" title="Xóa toàn bộ danh sách">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Xóa tất cả
+          </button>
+        </div>
+      </div>
+
+      <!-- Bảng thống kê dữ liệu 2 cột chuẩn -->
+      <div class="table-responsive">
+        <table class="data-table" id="qrTable">
+          <thead>
+            <tr>
+              <th class="col-index">STT</th>
+              <th class="col-qr">DỮ LIỆU QR</th>
+              <th class="col-qty">SỐ LƯỢNG</th>
+              <th class="col-action">THAO TÁC</th>
+            </tr>
+          </thead>
+          <tbody id="qrTableBody">
+            <!-- Render dữ liệu tự động tại đây -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state d-none" id="emptyState">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+        </svg>
+        <p>Chưa có dữ liệu nào. Hãy quét mã QR đầu tiên!</p>
+      </div>
+    </section>
+
+    <!-- Modal chỉnh sửa số lượng thủ công -->
+    <div class="modal-overlay d-none" id="editModal">
+      <div class="modal-card">
+        <h3>Chỉnh sửa số lượng</h3>
+        <p class="modal-subtitle" id="editItemCode"></p>
+        <div class="modal-body">
+          <label for="editQtyInput">Số lượng mới:</label>
+          <input type="number" id="editQtyInput" min="1" step="1">
+        </div>
+        <div class="modal-actions">
+          <button id="btnCancelEdit" class="btn btn-outline">Hủy</button>
+          <button id="btnSaveEdit" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Ứng dụng chạy trực tiếp trên trình duyệt bằng LocalStorage • Tương thích mọi thiết bị</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
