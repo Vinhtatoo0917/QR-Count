@@ -138,45 +138,68 @@ async function openScannerFullscreen() {
       throw new Error('Thư viện quét mã chưa được tải. Hãy kiểm tra kết nối mạng.');
     }
 
+    // Trên iOS WebClip (HomeScreen App), cần kích hoạt quyền MediaDevices một cách tường minh trước
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const streamTest = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: currentCameraFacing } }
+        });
+        // Tắt stream test ngay sau khi được cấp quyền
+        streamTest.getTracks().forEach(track => track.stop());
+      } catch (e) {
+        console.warn('Yêu cầu quyền getUserMedia trực tiếp:', e);
+      }
+    }
+
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("reader");
     }
 
     const config = {
-      fps: 30, // 30 FPS siêu mượt, loại bỏ hiện tượng giật lag khung hình
+      fps: 30,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const edge = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
         return { width: Math.max(edge, 220), height: Math.max(edge, 220) };
       },
-      aspectRatio: window.innerHeight / window.innerWidth,
-      videoConstraints: {
-        facingMode: currentCameraFacing,
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30 }
-      }
+      aspectRatio: window.innerHeight / window.innerWidth
     };
 
-    // Thử khởi động bằng facingMode trước
+    // Cách 1: Thử mở bằng camera môi trường (sau) trên iOS/Android
     try {
       await html5QrCode.start(
-        { facingMode: currentCameraFacing },
+        { facingMode: { exact: currentCameraFacing } },
         config,
         (decodedText) => handleScanSuccess(decodedText),
         () => { }
       );
       isScanning = true;
       return;
-    } catch (facingErr) {
-      console.warn('Không thể mở bằng facingMode, thử lấy danh sách camera cụ thể:', facingErr);
+    } catch (exactErr) {
+      // Cách 2: Nếu không cho exact, thử facingMode thông thường
+      try {
+        await html5QrCode.start(
+          { facingMode: currentCameraFacing },
+          config,
+          (decodedText) => handleScanSuccess(decodedText),
+          () => { }
+        );
+        isScanning = true;
+        return;
+      } catch (facingErr) {
+        console.warn('Lỗi facingMode thông thường, chuyển sang dò Device ID:', facingErr);
+      }
     }
 
-    // Cơ chế Fallback: Lấy danh sách camera thực tế trên thiết bị để mở trực tiếp
+    // Cách 3 (Dự phòng cho iOS Home Screen): Lấy camera qua danh sách phần cứng
     const devices = await Html5Qrcode.getCameras();
     if (devices && devices.length > 0) {
-      // Ưu tiên chọn camera sau nếu có
       let selectedCam = devices[0].id;
-      const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('sau') || d.label.toLowerCase().includes('environment'));
+      const backCam = devices.find(d => 
+        d.label.toLowerCase().includes('back') || 
+        d.label.toLowerCase().includes('sau') || 
+        d.label.toLowerCase().includes('environment') ||
+        d.label.toLowerCase().includes('rear')
+      );
       if (backCam) {
         selectedCam = backCam.id;
       }
@@ -193,11 +216,16 @@ async function openScannerFullscreen() {
     }
 
   } catch (err) {
-    console.error('Lỗi khi mở camera:', err);
+    console.error('Lỗi khi mở camera trên iOS/PWA:', err);
     isScanning = false;
-    let msg = '<strong>Không thể mở Camera:</strong><br>';
+    let msg = '<strong>Không thể mở Camera trên iPhone/iOS:</strong><br>';
     if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-      msg += 'Quyền truy cập Camera đang bị chặn.<br>👉 <em>Hãy bấm vào biểu tượng Ổ Khóa hoặc biểu tượng "aA" trên thanh URL trình duyệt và chọn "Cho phép (Allow) Camera", sau đó tải lại trang.</em>';
+      msg += 'Quyền Camera trên iPhone chưa được cấp cho biểu tượng này.<br><br>' +
+             '👉 <strong>Cách xử lý nhanh nhất:</strong><br>' +
+             '1. Vào <strong>Cài đặt (Settings)</strong> của iPhone.<br>' +
+             '2. Kéo xuống chọn <strong>Safari</strong>.<br>' +
+             '3. Tìm mục <strong>Camera</strong> -> Đổi thành <strong>Cho phép (Allow)</strong> hoặc <strong>Hỏi (Ask)</strong>.<br>' +
+             '4. Đóng app QR Count rồi mở lại!';
     } else {
       msg += (err.message || err);
     }
