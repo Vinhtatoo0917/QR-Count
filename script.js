@@ -201,12 +201,8 @@ async function openScannerFullscreen() {
     html5QrCode = new Html5Qrcode("reader");
 
     const config = {
-      fps: 30,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const edge = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
-        return { width: Math.max(edge, 220), height: Math.max(edge, 220) };
-      },
-      aspectRatio: window.innerHeight / window.innerWidth
+      fps: 25,
+      qrbox: { width: 250, height: 250 }
     };
 
     // Khởi động trực tiếp - Trình duyệt sẽ nhớ quyền vĩnh viễn
