@@ -97,12 +97,18 @@ async function openScannerFullscreen() {
     }
 
     const config = {
-      fps: 20,
+      fps: 30, // 30 FPS siêu mượt, loại bỏ hiện tượng giật lag khung hình
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const edge = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
         return { width: Math.max(edge, 220), height: Math.max(edge, 220) };
       },
-      aspectRatio: window.innerHeight / window.innerWidth
+      aspectRatio: window.innerHeight / window.innerWidth,
+      videoConstraints: {
+        facingMode: currentCameraFacing,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
+      }
     };
 
     // Thử khởi động bằng facingMode trước
@@ -359,14 +365,15 @@ function saveEditModal() {
   closeEditModal();
 }
 
-// --- XUẤT CSV CHO EXCEL ---
-function exportToCSV() {
+// --- XUẤT CSV CHO EXCEL & TỰ ĐỘNG BẬT MENU CHIA SẺ (WEB SHARE API) ---
+async function exportToCSV() {
   const keys = Object.keys(qrRecords);
   if (keys.length === 0) {
     alert('Chưa có dữ liệu để xuất file CSV.');
     return;
   }
 
+  // Tiêu đề UTF-8 BOM để Excel hiển thị đúng tiếng Việt
   let csvContent = '\uFEFF';
   csvContent += '"DỮ LIỆU QR","SỐ LƯỢNG"\r\n';
 
@@ -375,12 +382,34 @@ function exportToCSV() {
     csvContent += `"${escapedValue}",${qrRecords[key]}\r\n`;
   });
 
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const fileName = `QR_Count_${timestamp}.csv`;
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const file = new File([blob], fileName, { type: 'text/csv;charset=utf-8;' });
+
+  // 1. Tự động kích hoạt menu chia sẻ của điện thoại (Zalo, Drive, Gmail, v.v.)
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title: 'Báo cáo thống kê quét mã QR',
+        text: `Danh sách quét mã QR ngày ${timestamp}`,
+        files: [file]
+      });
+      return; // Người dùng đã chia sẻ thành công
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Không thể mở menu chia sẻ file:', err);
+      } else {
+        return; // Người dùng chủ động bấm hủy menu chia sẻ
+      }
+    }
+  }
+
+  // 2. Fallback: Nếu mở trên máy tính hoặc trình duyệt không hỗ trợ share file -> Tự động tải về máy
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const timestamp = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `QR_Count_${timestamp}.csv`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
