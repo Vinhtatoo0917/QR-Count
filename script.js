@@ -111,7 +111,7 @@ async function openScannerFullscreen() {
         { facingMode: currentCameraFacing },
         config,
         (decodedText) => handleScanSuccess(decodedText),
-        () => {}
+        () => { }
       );
       isScanning = true;
       return;
@@ -133,7 +133,7 @@ async function openScannerFullscreen() {
         selectedCam,
         config,
         (decodedText) => handleScanSuccess(decodedText),
-        () => {}
+        () => { }
       );
       isScanning = true;
     } else {
@@ -303,7 +303,7 @@ function escapeHtml(str) {
 }
 
 // --- THAO TÁC XÓA & SỬA ---
-window.deleteRecord = function(key) {
+window.deleteRecord = function (key) {
   if (confirm(`Bạn có chắc muốn xóa mã sau khỏi danh sách?\n\n"${key}"`)) {
     delete qrRecords[key];
     saveData();
@@ -333,7 +333,7 @@ const editModal = document.getElementById('editModal');
 const editItemCode = document.getElementById('editItemCode');
 const editQtyInput = document.getElementById('editQtyInput');
 
-window.openEditModal = function(key) {
+window.openEditModal = function (key) {
   currentEditingKey = key;
   editItemCode.textContent = key;
   editQtyInput.value = qrRecords[key] || 1;
@@ -413,7 +413,7 @@ function handleImportJSON(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
