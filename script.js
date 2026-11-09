@@ -126,9 +126,48 @@ function hideCamAlert() {
   }
 }
 
+async function closeScannerFullscreen() {
+  if (html5QrCode) {
+    try {
+      const state = html5QrCode.getState();
+      // Nếu camera đang chạy (SCANNING hoặc PAUSED) thì phải stop trước
+      if (state === 2 || state === 3 || isScanning) { // Html5QrcodeScannerState.SCANNING = 2, PAUSED = 3
+        await html5QrCode.stop();
+      }
+    } catch (e) {
+      console.warn('Lỗi khi dừng camera:', e);
+    }
+
+    try {
+      await html5QrCode.clear();
+    } catch (e) {
+      console.warn('Lỗi khi clear camera:', e);
+    }
+  }
+
+  isScanning = false;
+  html5QrCode = null; // Reset instance để lần mở sau tạo mới hoàn toàn sạch sẽ
+  document.getElementById('cameraFullscreenModal').classList.add('d-none');
+  hideCamAlert();
+}
+
 async function openScannerFullscreen() {
   closeResultModal();
   hideCamAlert();
+
+  // Đảm bảo dọn dẹp sạch sẽ phiên quét trước nếu còn sót
+  if (html5QrCode) {
+    try {
+      const state = html5QrCode.getState();
+      if (state === 2 || state === 3) {
+        await html5QrCode.stop();
+      }
+      await html5QrCode.clear();
+    } catch (e) {
+      console.warn('Dọn dẹp phiên quét cũ:', e);
+    }
+    html5QrCode = null;
+  }
 
   const modal = document.getElementById('cameraFullscreenModal');
   modal.classList.remove('d-none');
@@ -138,22 +177,8 @@ async function openScannerFullscreen() {
       throw new Error('Thư viện quét mã chưa được tải. Hãy kiểm tra kết nối mạng.');
     }
 
-    // Trên iOS WebClip (HomeScreen App), cần kích hoạt quyền MediaDevices một cách tường minh trước
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const streamTest = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: currentCameraFacing } }
-        });
-        // Tắt stream test ngay sau khi được cấp quyền
-        streamTest.getTracks().forEach(track => track.stop());
-      } catch (e) {
-        console.warn('Yêu cầu quyền getUserMedia trực tiếp:', e);
-      }
-    }
-
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
-    }
+    // Tạo instance mới tinh mỗi lần mở camera
+    html5QrCode = new Html5Qrcode("reader");
 
     const config = {
       fps: 30,
@@ -164,33 +189,21 @@ async function openScannerFullscreen() {
       aspectRatio: window.innerHeight / window.innerWidth
     };
 
-    // Cách 1: Thử mở bằng camera môi trường (sau) trên iOS/Android
+    // Cách 1: Thử mở bằng camera sau
     try {
       await html5QrCode.start(
-        { facingMode: { exact: currentCameraFacing } },
+        { facingMode: currentCameraFacing },
         config,
         (decodedText) => handleScanSuccess(decodedText),
         () => { }
       );
       isScanning = true;
       return;
-    } catch (exactErr) {
-      // Cách 2: Nếu không cho exact, thử facingMode thông thường
-      try {
-        await html5QrCode.start(
-          { facingMode: currentCameraFacing },
-          config,
-          (decodedText) => handleScanSuccess(decodedText),
-          () => { }
-        );
-        isScanning = true;
-        return;
-      } catch (facingErr) {
-        console.warn('Lỗi facingMode thông thường, chuyển sang dò Device ID:', facingErr);
-      }
+    } catch (facingErr) {
+      console.warn('Thử dò camera theo ID phần cứng:', facingErr);
     }
 
-    // Cách 3 (Dự phòng cho iOS Home Screen): Lấy camera qua danh sách phần cứng
+    // Cách 2: Dò danh sách camera phần cứng
     const devices = await Html5Qrcode.getCameras();
     if (devices && devices.length > 0) {
       let selectedCam = devices[0].id;
@@ -231,19 +244,6 @@ async function openScannerFullscreen() {
     }
     showCamAlert(msg);
   }
-}
-
-async function closeScannerFullscreen() {
-  if (html5QrCode && isScanning) {
-    try {
-      await html5QrCode.stop();
-    } catch (e) {
-      console.warn('Lỗi khi dừng camera:', e);
-    }
-  }
-  isScanning = false;
-  document.getElementById('cameraFullscreenModal').classList.add('d-none');
-  hideCamAlert();
 }
 
 async function switchCamera() {
