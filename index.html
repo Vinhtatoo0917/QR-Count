@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Hệ Thống Quét Mã QR & Đếm Số Lượng</title>
-  <meta name="description" content="Website quét mã QR và thống kê số lượng tự động, lưu trữ trên trình duyệt, không cần backend.">
+  <meta name="description" content="Website quét mã QR và thống kê số lượng tự động, lưu trữ trên trình duyệt.">
   <link rel="stylesheet" href="style.css">
-  <!-- Thư viện quét mã QR siêu nhẹ, hoạt động ổn định trên iOS, Android và PC -->
+  <!-- Thư viện quét mã QR siêu nhẹ -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
+
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <svg class="brand-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="brand-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+          stroke-width="2">
           <rect x="3" y="3" width="7" height="7"></rect>
           <rect x="14" y="3" width="7" height="7"></rect>
           <rect x="14" y="14" width="7" height="7"></rect>
@@ -39,24 +42,25 @@
       </div>
     </section>
 
-    <!-- Vùng Camera & Quét mã QR -->
-    <section class="scanner-section">
-      <div class="scanner-header">
-        <h2>Camera Quét Mã</h2>
-        <div class="scanner-status" id="scanStatus">Sẵn sàng</div>
-      </div>
-
-      <!-- Khung hiển thị camera -->
-      <div class="camera-wrapper">
-        <div id="reader"></div>
-        <div class="camera-placeholder" id="cameraPlaceholder">
-          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
+    <!-- KHU VỰC NÚT ICON QUÉT MÃ QR NỔI BẬT -->
+    <section class="scan-trigger-section">
+      <button id="btnOpenScanner" class="qr-trigger-btn" title="Bấm để mở camera quét mã QR">
+        <div class="qr-btn-inner">
+          <svg class="qr-btn-icon" viewBox="0 0 24 24" width="68" height="68" fill="none" stroke="currentColor"
+            stroke-width="1.8">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <path d="M10 4v3a1 1 0 0 0 1 1h3"></path>
+            <path d="M4 10h3a1 1 0 0 1 1 1v3"></path>
+            <path d="M10 14h1v1h-1z"></path>
+            <path d="M10 17h4v3h-4z"></path>
+            <path d="M17 10h3v4h-3z"></path>
           </svg>
-          <p>Nhấn "Bắt đầu quét" để kích hoạt camera</p>
+          <span class="qr-btn-label">CHẠM ĐỂ QUÉT MÃ QR</span>
         </div>
-      </div>
+      </button>
 
       <!-- Thông báo kết quả quét gần nhất -->
       <div class="recent-scan-box" id="recentScanBox">
@@ -64,41 +68,14 @@
         <code class="recent-code" id="recentScanCode">-</code>
         <span class="recent-badge" id="recentScanBadge"></span>
       </div>
-
-      <!-- Nút điều khiển Scanner -->
-      <div class="controls-row">
-        <button id="btnStartScan" class="btn btn-primary">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          Bắt đầu quét
-        </button>
-        <button id="btnStopScan" class="btn btn-secondary" disabled>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
-          Dừng quét
-        </button>
-        <button id="btnSwitchCam" class="btn btn-outline" title="Chuyển Camera Trước/Sau">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 7h-3a2 2 0 0 1-2-2V3"></path>
-            <path d="M4 17h3a2 2 0 0 1 2 2v2"></path>
-            <path d="M16 21l4-4-4-4"></path>
-            <path d="M8 3l-4 4 4 4"></path>
-          </svg>
-          Đổi Camera
-        </button>
-        <label class="sound-toggle" title="Bật/Tắt âm báo khi quét thành công">
-          <input type="checkbox" id="chkSound" checked>
-          <span>Âm báo</span>
-        </label>
-      </div>
-
-      <!-- Hộp thông báo lỗi/hướng dẫn camera -->
-      <div id="camAlert" class="alert-box d-none"></div>
     </section>
 
     <!-- Danh sách & Quản lý dữ liệu -->
     <section class="data-section">
       <div class="data-toolbar">
         <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -142,7 +119,7 @@
         </div>
       </div>
 
-      <!-- Bảng thống kê dữ liệu 2 cột chuẩn -->
+      <!-- Bảng thống kê dữ liệu -->
       <div class="table-responsive">
         <table class="data-table" id="qrTable">
           <thead>
@@ -165,33 +142,100 @@
           <line x1="9" y1="9" x2="15" y2="15"></line>
           <line x1="15" y1="9" x2="9" y2="15"></line>
         </svg>
-        <p>Chưa có dữ liệu nào. Hãy quét mã QR đầu tiên!</p>
+        <p>Chưa có dữ liệu nào. Bấm vào icon QR ở trên để quét mã đầu tiên!</p>
       </div>
     </section>
 
-    <!-- Modal chỉnh sửa số lượng thủ công -->
-    <div class="modal-overlay d-none" id="editModal">
-      <div class="modal-card">
-        <h3>Chỉnh sửa số lượng</h3>
-        <p class="modal-subtitle" id="editItemCode"></p>
-        <div class="modal-body">
-          <label for="editQtyInput">Số lượng mới:</label>
-          <input type="number" id="editQtyInput" min="1" step="1">
-        </div>
-        <div class="modal-actions">
-          <button id="btnCancelEdit" class="btn btn-outline">Hủy</button>
-          <button id="btnSaveEdit" class="btn btn-primary">Lưu thay đổi</button>
-        </div>
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Dữ liệu lưu trữ an toàn trong LocalStorage trình duyệt • Tương thích mọi thiết bị</p>
+    </footer>
+  </div>
+
+  <!-- MODAL FULL MÀN HÌNH QUÉT CAMERA -->
+  <div id="cameraFullscreenModal" class="camera-fullscreen-modal d-none">
+    <!-- Nút Đóng (X) góc trên bên phải -->
+    <button id="btnCloseScanner" class="btn-close-scanner" title="Đóng camera (X)">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+
+    <!-- Nút đổi camera trước/sau -->
+    <button id="btnSwitchCam" class="btn-switch-camera" title="Đổi camera trước / sau">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 7h-3a2 2 0 0 1-2-2V3"></path>
+        <path d="M4 17h3a2 2 0 0 1 2 2v2"></path>
+        <path d="M16 21l4-4-4-4"></path>
+        <path d="M8 3l-4 4 4 4"></path>
+      </svg>
+    </button>
+
+    <!-- Khung camera toàn màn hình -->
+    <div class="fullscreen-camera-body">
+      <div id="reader"></div>
+
+      <!-- Hướng dẫn ngắm mã -->
+      <div class="scanner-aim-guide">
+        <div class="aim-reticle"></div>
+        <p class="aim-text">Đặt mã QR vào giữa khung hình</p>
       </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="app-footer">
-      <p>Ứng dụng chạy trực tiếp trên trình duyệt bằng LocalStorage • Tương thích mọi thiết bị</p>
-    </footer>
+    <!-- Thông báo lỗi camera nếu có -->
+    <div id="camAlert" class="fullscreen-alert d-none"></div>
+  </div>
+
+  <!-- POPUP THÔNG BÁO TO KHI QUÉT THÀNH CÔNG -->
+  <div id="scanResultModal" class="scan-result-modal d-none">
+    <div class="scan-result-card">
+      <div class="scan-result-icon">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2 class="scan-result-title">QUÉT THÀNH CÔNG!</h2>
+      <div class="scan-result-content">
+        <span class="result-label">Nội dung mã:</span>
+        <div class="result-text" id="modalResultText"></div>
+        <div class="result-qty-box">
+          <span class="result-status" id="modalResultStatus">MÃ MỚI</span>
+          <span class="result-count">Tổng số lượng: <strong id="modalResultQty">1</strong></span>
+        </div>
+      </div>
+      <div class="scan-result-actions">
+        <button id="btnScanNext" class="btn btn-primary btn-large">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Quét tiếp mã khác
+        </button>
+        <button id="btnCloseResult" class="btn btn-outline btn-large">Xem bảng thống kê</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CHỈNH SỬA SỐ LƯỢNG THỦ CÔNG -->
+  <div class="modal-overlay d-none" id="editModal">
+    <div class="modal-card">
+      <h3>Chỉnh sửa số lượng</h3>
+      <p class="modal-subtitle" id="editItemCode"></p>
+      <div class="modal-body">
+        <label for="editQtyInput">Số lượng mới:</label>
+        <input type="number" id="editQtyInput" min="1" step="1">
+      </div>
+      <div class="modal-actions">
+        <button id="btnCancelEdit" class="btn btn-outline">Hủy</button>
+        <button id="btnSaveEdit" class="btn btn-primary">Lưu thay đổi</button>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>
 </body>
-</html>
 
+</html>
