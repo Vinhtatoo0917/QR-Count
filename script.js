@@ -13,27 +13,73 @@ let currentCameraFacing = 'environment'; // 'environment' (sau) hoặc 'user' (t
 // Quản lý modal sửa số lượng
 let currentEditingKey = null;
 
-// --- PHÁT ÂM THANH BÍP (WEB AUDIO API) ---
+// --- KHỞI TẠO AUDIO CONTEXT ĐỂ MỞ KHÓA ÂM THANH TRÊN IOS/ANDROID ---
+let sharedAudioCtx = null;
+
+function unlockAudioOnMobile() {
+  try {
+    if (!sharedAudioCtx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        sharedAudioCtx = new AudioCtx();
+      }
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+  } catch (e) {
+    console.warn('Không thể khởi tạo AudioContext trước:', e);
+  }
+}
+
+// --- PHÁT ÂM THANH BÍP CỰC TO VÀ RÕ TRÊN MỌI THIẾT BỊ ---
 function playBeepSound() {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); // 880Hz
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx();
+    }
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
+    const ctx = sharedAudioCtx;
+    const now = ctx.currentTime;
+
+    // Tầng âm 1: Sóng vuông (Square wave) có độ đanh và âm lượng vang cực lớn như máy quét siêu thị
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'square';
+    osc1.frequency.setValueAtTime(1400, now); // 1400Hz (tiếng đanh vang)
+    gain1.gain.setValueAtTime(0.8, now); // Max volume 80%
+    gain1.gain.linearRampToValueAtTime(0.01, now + 0.22);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+
+    // Tầng âm 2: Sóng sin phụ trợ tạo độ dày tiếng (1800Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1800, now);
+    gain2.gain.setValueAtTime(0.5, now);
+    gain2.gain.linearRampToValueAtTime(0.01, now + 0.22);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + 0.22);
+    osc2.start(now);
+    osc2.stop(now + 0.22);
+
+    // Tùy chọn rung máy (Haptic Feedback) trên điện thoại Android
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]);
+    }
   } catch (e) {
-    console.warn('AudioContext không khả dụng:', e);
+    console.warn('Lỗi khi phát âm thanh:', e);
   }
 }
 
@@ -586,8 +632,15 @@ function handleImportJSON(event) {
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
 
-  // Bấm icon QR để mở Camera Full Màn Hình
-  document.getElementById('btnOpenScanner').addEventListener('click', openScannerFullscreen);
+  // Bấm icon QR để mở Camera Full Màn Hình & Kích hoạt âm thanh
+  document.getElementById('btnOpenScanner').addEventListener('click', () => {
+    unlockAudioOnMobile();
+    openScannerFullscreen();
+  });
+
+  // Kích hoạt âm thanh khi người dùng bấm bất kỳ đâu lần đầu tiên trên màn hình
+  document.body.addEventListener('touchstart', unlockAudioOnMobile, { once: true });
+  document.body.addEventListener('click', unlockAudioOnMobile, { once: true });
 
   // Nút X đóng camera
   document.getElementById('btnCloseScanner').addEventListener('click', closeScannerFullscreen);
