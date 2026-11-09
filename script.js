@@ -416,6 +416,107 @@ async function exportToCSV() {
   URL.revokeObjectURL(url);
 }
 
+// --- NHẬP LẠI DỮ LIỆU TỪ FILE EXCEL (CSV) ---
+function parseCSV(text) {
+  // Loại bỏ BOM nếu có
+  if (text.charCodeAt(0) === 0xFEFF) {
+    text = text.slice(1);
+  }
+
+  const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const result = {};
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Bỏ qua dòng tiêu đề nếu có
+    if (i === 0 && (line.includes('DỮ LIỆU') || line.includes('SỐ LƯỢNG') || line.toLowerCase().includes('qr'))) {
+      continue;
+    }
+
+    // Tách cột bằng dấu phẩy theo chuẩn CSV (hỗ trợ dấu ngoặc kép)
+    let parts = [];
+    let insideQuotes = false;
+    let currentPart = '';
+
+    for (let c = 0; c < line.length; c++) {
+      const char = line[c];
+      if (char === '"') {
+        if (insideQuotes && line[c + 1] === '"') {
+          currentPart += '"';
+          c++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        parts.push(currentPart);
+        currentPart = '';
+      } else {
+        currentPart += char;
+      }
+    }
+    parts.push(currentPart);
+
+    if (parts.length >= 2) {
+      const qrData = parts[0].trim();
+      const qtyStr = parts[1].trim();
+      const qty = parseInt(qtyStr, 10);
+
+      if (qrData && !isNaN(qty) && qty > 0) {
+        result[qrData] = (result[qrData] || 0) + qty;
+      }
+    } else if (parts.length === 1 && parts[0].trim().length > 0) {
+      // Trường hợp người dùng nhập file chỉ có danh sách mã (mỗi dòng 1 mã, mặc định số lượng = 1)
+      const qrData = parts[0].trim();
+      result[qrData] = (result[qrData] || 0) + 1;
+    }
+  }
+
+  return result;
+}
+
+function handleImportCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const text = e.target.result;
+      const data = parseCSV(text);
+      const keys = Object.keys(data);
+
+      if (keys.length === 0) {
+        throw new Error('Không tìm thấy dữ liệu hợp lệ trong file Excel CSV.');
+      }
+
+      const merge = confirm(`Tìm thấy ${keys.length} loại mã trong file Excel.\n\nBạn muốn GỘP vào danh sách hiện tại?\n- Bấm "OK" để GỘP (cộng dồn số lượng).\n- Bấm "Cancel" để GHI ĐÈ thay thế danh sách cũ.`);
+
+      if (merge) {
+        for (const [k, v] of Object.entries(data)) {
+          qrRecords[k] = (qrRecords[k] || 0) + v;
+        }
+      } else {
+        qrRecords = {};
+        for (const [k, v] of Object.entries(data)) {
+          qrRecords[k] = v;
+        }
+      }
+
+      saveData();
+      renderTable();
+      alert(`Đã nhập thành công ${keys.length} mã từ file Excel!`);
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi khi đọc file Excel CSV: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
 // --- SAO LƯU & NHẬP JSON ---
 function exportToJSON() {
   const keys = Object.keys(qrRecords);
@@ -520,10 +621,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable();
   });
 
-  // Xuất & Nhập dữ liệu
+  // Xuất & Nhập dữ liệu CSV (Excel)
   document.getElementById('btnExportCSV').addEventListener('click', exportToCSV);
-  document.getElementById('btnExportJSON').addEventListener('click', exportToJSON);
+  const fileInputCSV = document.getElementById('fileInputCSV');
+  document.getElementById('btnImportCSV').addEventListener('click', () => fileInputCSV.click());
+  fileInputCSV.addEventListener('change', handleImportCSV);
 
+  // Xuất & Nhập dữ liệu JSON
+  document.getElementById('btnExportJSON').addEventListener('click', exportToJSON);
   const fileInput = document.getElementById('fileInputJSON');
   document.getElementById('btnImportJSON').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', handleImportJSON);
