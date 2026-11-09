@@ -84,28 +84,14 @@ async function openScannerFullscreen() {
   closeResultModal();
   hideCamAlert();
 
-  // 1. Kiểm tra ngữ cảnh HTTPS bắt buộc trên điện thoại
-  const isSecure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (!isSecure) {
-    alert('LỖI BẢO MẬT: Điện thoại chỉ cho phép mở Camera qua kết nối HTTPS an toàn (hoặc localhost). Nếu bạn đang mở bằng IP nội bộ dạng "http://192.168.x.x", vui lòng đưa lên GitHub Pages hoặc dùng đường dẫn https://.');
-    return;
-  }
-
-  // 2. Kiểm tra API MediaDevices
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('Trình duyệt này không hỗ trợ hoặc đang chặn API Camera. Nếu bạn đang mở link qua Zalo/Messenger/Facebook, vui lòng bấm vào dấu 3 chấm góc trên và chọn "Mở bằng trình duyệt Chrome / Safari".');
-    return;
-  }
-
-  if (typeof Html5Qrcode === 'undefined') {
-    alert('Không thể tải thư viện quét mã QR. Vui lòng kiểm tra lại mạng.');
-    return;
-  }
-
   const modal = document.getElementById('cameraFullscreenModal');
   modal.classList.remove('d-none');
 
   try {
+    if (typeof Html5Qrcode === 'undefined') {
+      throw new Error('Thư viện quét mã chưa được tải. Hãy kiểm tra kết nối mạng.');
+    }
+
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("reader");
     }
@@ -119,26 +105,47 @@ async function openScannerFullscreen() {
       aspectRatio: window.innerHeight / window.innerWidth
     };
 
-    await html5QrCode.start(
-      { facingMode: currentCameraFacing },
-      config,
-      (decodedText) => {
-        handleScanSuccess(decodedText);
-      },
-      () => {
-        // Tiếp tục quét
-      }
-    );
+    // Thử khởi động bằng facingMode trước
+    try {
+      await html5QrCode.start(
+        { facingMode: currentCameraFacing },
+        config,
+        (decodedText) => handleScanSuccess(decodedText),
+        () => {}
+      );
+      isScanning = true;
+      return;
+    } catch (facingErr) {
+      console.warn('Không thể mở bằng facingMode, thử lấy danh sách camera cụ thể:', facingErr);
+    }
 
-    isScanning = true;
+    // Cơ chế Fallback: Lấy danh sách camera thực tế trên thiết bị để mở trực tiếp
+    const devices = await Html5Qrcode.getCameras();
+    if (devices && devices.length > 0) {
+      // Ưu tiên chọn camera sau nếu có
+      let selectedCam = devices[0].id;
+      const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('sau') || d.label.toLowerCase().includes('environment'));
+      if (backCam) {
+        selectedCam = backCam.id;
+      }
+
+      await html5QrCode.start(
+        selectedCam,
+        config,
+        (decodedText) => handleScanSuccess(decodedText),
+        () => {}
+      );
+      isScanning = true;
+    } else {
+      throw new Error('Không tìm thấy thiết bị camera nào trên máy.');
+    }
+
   } catch (err) {
     console.error('Lỗi khi mở camera:', err);
     isScanning = false;
-    let msg = '<strong>Không thể truy cập Camera:</strong><br>';
+    let msg = '<strong>Không thể mở Camera:</strong><br>';
     if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-      msg += 'Quyền truy cập Camera đã bị từ chối.<br>👉 <em>Hãy bấm vào biểu tượng Ổ Khóa hoặc nút "aA" trên thanh địa chỉ URL để cấp quyền Cho phép (Allow) Camera, sau đó thử lại.</em>';
-    } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
-      msg += 'Không tìm thấy thiết bị camera trên máy.';
+      msg += 'Quyền truy cập Camera đang bị chặn.<br>👉 <em>Hãy bấm vào biểu tượng Ổ Khóa hoặc biểu tượng "aA" trên thanh URL trình duyệt và chọn "Cho phép (Allow) Camera", sau đó tải lại trang.</em>';
     } else {
       msg += (err.message || err);
     }
