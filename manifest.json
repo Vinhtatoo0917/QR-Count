@@ -3,7 +3,7 @@
   "short_name": "QR Count",
   "description": "Ứng dụng quét mã QR và tự động thống kê số lượng chuyên nghiệp",
   "start_url": "./index.html",
-  "display": "standalone",
+  "display": "minimal-ui",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
