@@ -159,12 +159,12 @@ function updateDebugInfo(extraError = null) {
   let videoDetail = 'Chưa tìm thấy thẻ <video>';
   if (videoEl) {
     videoDetail = `Video readyState: ${videoEl.readyState} (HAVE_ENOUGH_DATA=${videoEl.HAVE_ENOUGH_DATA})\n` +
-                  `Kích thước: ${videoEl.videoWidth}x${videoEl.videoHeight} (client: ${videoEl.clientWidth}x${videoEl.clientHeight})\n` +
-                  `Paused: ${videoEl.paused}, Muted: ${videoEl.muted}, PlaysInline: ${videoEl.playsInline || videoEl.getAttribute('playsinline')}\n` +
-                  `CSS display: ${window.getComputedStyle(videoEl).display}, visibility: ${window.getComputedStyle(videoEl).visibility}`;
+      `Kích thước: ${videoEl.videoWidth}x${videoEl.videoHeight} (client: ${videoEl.clientWidth}x${videoEl.clientHeight})\n` +
+      `Paused: ${videoEl.paused}, Muted: ${videoEl.muted}, PlaysInline: ${videoEl.playsInline || videoEl.getAttribute('playsinline')}\n` +
+      `CSS display: ${window.getComputedStyle(videoEl).display}, visibility: ${window.getComputedStyle(videoEl).visibility}`;
   }
 
-  contentEl.textContent = 
+  contentEl.textContent =
     `📱 MÔI TRƯỜNG:\n` +
     `- PWA Standalone: ${isStandalone}\n` +
     `- iOS Device: ${isIOS}\n` +
@@ -325,9 +325,9 @@ async function openScannerFullscreen() {
       const devices = await Html5Qrcode.getCameras();
       if (devices && devices.length > 0) {
         let selectedCam = devices[0].id;
-        const backCam = devices.find(d => 
-          d.label.toLowerCase().includes('back') || 
-          d.label.toLowerCase().includes('sau') || 
+        const backCam = devices.find(d =>
+          d.label.toLowerCase().includes('back') ||
+          d.label.toLowerCase().includes('sau') ||
           d.label.toLowerCase().includes('environment') ||
           d.label.toLowerCase().includes('rear')
         );
@@ -341,7 +341,7 @@ async function openScannerFullscreen() {
           (decodedText) => handleScanSuccess(decodedText),
           () => { }
         );
-        
+
         // Lưu camera này vào localStorage để sau này không bị quét hay dò lại
         localStorage.setItem(PREFERRED_CAM_KEY, selectedCam);
         started = true;
@@ -379,9 +379,9 @@ async function openScannerFullscreen() {
     let msg = '<strong>Không thể mở Camera:</strong><br>';
     if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
       msg += 'Quyền Camera chưa được cấp "Luôn cho phép".<br><br>' +
-             '👉 <strong>Cài đặt 1 lần để không bao giờ hỏi lại:</strong><br>' +
-             '- <strong>Trên iPhone/iPad:</strong> Vào <i>Cài đặt > Safari > Camera</i> > chọn <b>Cho phép (Allow)</b>.<br>' +
-             '- <strong>Trên Android/Chrome:</strong> Bấm vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ > <i>Quyền / Quyền trang web > Máy ảnh</i> > chọn <b>Cho phép</b>.';
+        '👉 <strong>Cài đặt 1 lần để không bao giờ hỏi lại:</strong><br>' +
+        '- <strong>Trên iPhone/iPad:</strong> Vào <i>Cài đặt > Safari > Camera</i> > chọn <b>Cho phép (Allow)</b>.<br>' +
+        '- <strong>Trên Android/Chrome:</strong> Bấm vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ > <i>Quyền / Quyền trang web > Máy ảnh</i> > chọn <b>Cho phép</b>.';
     } else {
       msg += (err.message || err);
     }
@@ -406,12 +406,36 @@ async function switchCamera() {
   }
 }
 
+// Hàm kiểm tra chuỗi có phải là đường dẫn (URL / link) hay không
+function isUrl(string) {
+  if (!string || typeof string !== 'string') return false;
+  const trimmed = string.trim();
+  // Kiểm tra tiền tố URL hoặc protocol thông dụng
+  if (/^(https?:\/\/|ftp:\/\/|file:\/\/|www\.)/i.test(trimmed)) {
+    return true;
+  }
+  // Thử parse bằng URL API
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'ftp:';
+  } catch (_) {
+    return false;
+  }
+}
+
 // --- XỬ LÝ KHI QUÉT THÀNH CÔNG ---
 async function handleScanSuccess(decodedText) {
   // Lập tức dừng và tắt camera toàn màn hình
   await closeScannerFullscreen();
 
-  const qrKey = String(decodedText);
+  const qrKey = String(decodedText).trim();
+
+  // Kiểm tra nếu dữ liệu quét được là đường dẫn (URL) thì bỏ qua không thêm vào
+  if (isUrl(qrKey)) {
+    alert(`Dữ liệu quét được là đường dẫn (URL) nên không được thêm:\n\n${qrKey}`);
+    return;
+  }
+
   let isNew = false;
 
   if (Object.prototype.hasOwnProperty.call(qrRecords, qrKey)) {
