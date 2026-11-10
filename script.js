@@ -618,13 +618,21 @@ async function exportToCSV() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Cài đặt độ rộng cột cho đẹp mắt
+    // Chuẩn hóa độ rộng cột và chiều cao hàng khớp chính xác 100% với file demo (A: 65, B: 37)
     ws['!cols'] = [
-      { wch: 38 }, // MÃ SẢN PHẨM/ TÊN SẢN PHẨM
-      { wch: 26 }  // SỐ LƯỢNG TEM CẦN IN
+      { wch: 65 }, // Cột A: MÃ SẢN PHẨM/ TÊN SẢN PHẨM
+      { wch: 37 }  // Cột B: SỐ LƯỢNG TEM CẦN IN
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'ThongKeQR');
+    // Chiều cao hàng (hpt): Hàng 1 (Header) cao 22, các hàng dữ liệu cao 15.75
+    const rowHeights = [{ hpt: 22 }];
+    for (let r = 0; r < keys.length; r++) {
+      rowHeights.push({ hpt: 15.75 });
+    }
+    ws['!rows'] = rowHeights;
+
+    // Tên Sheet chuẩn: "Sheet1" như file demo
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
