@@ -85,6 +85,49 @@ function playBeepSound() {
   }
 }
 
+// --- PHÁT ÂM THANH CẢNH BÁO / TỪ CHỐI (KHI QUÉT PHẢI LINK/URL) ---
+function playErrorSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx();
+    }
+
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+
+    const ctx = sharedAudioCtx;
+    const now = ctx.currentTime;
+
+    // Âm thanh báo lỗi 2 hồi trầm dứt khoát (boop - boop)
+    const playTone = (startOffset, freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + startOffset);
+      gain.gain.setValueAtTime(0.7, now + startOffset);
+      gain.gain.linearRampToValueAtTime(0.01, now + startOffset + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + startOffset);
+      osc.stop(now + startOffset + 0.16);
+    };
+
+    playTone(0, 300);
+    playTone(0.2, 220);
+
+    // Rung cảnh báo dài
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  } catch (e) {
+    console.warn('Lỗi khi phát âm thanh cảnh báo:', e);
+  }
+}
+
 // --- QUẢN LÝ LOCALSTORAGE ---
 function loadData() {
   try {
@@ -414,6 +457,10 @@ function isUrl(string) {
   if (/^(https?:\/\/|ftp:\/\/|file:\/\/|www\.)/i.test(trimmed)) {
     return true;
   }
+  // Kiểm tra domain thông dụng có đuôi tên miền (e.g. example.com, bit.ly/abc)
+  if (/^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}(\/.*)?$/i.test(trimmed)) {
+    return true;
+  }
   // Thử parse bằng URL API
   try {
     const url = new URL(trimmed);
@@ -430,9 +477,10 @@ async function handleScanSuccess(decodedText) {
 
   const qrKey = String(decodedText).trim();
 
-  // Kiểm tra nếu dữ liệu quét được là đường dẫn (URL) thì bỏ qua không thêm vào
+  // Kiểm tra nếu dữ liệu quét được là đường dẫn (URL / https://) thì tự động thông báo đỏ và loại bỏ
   if (isUrl(qrKey)) {
-    alert(`Dữ liệu quét được là đường dẫn (URL) nên không được thêm:\n\n${qrKey}`);
+    playErrorSound();
+    showRejectedModal(qrKey, 'Đường dẫn (URL/Link) không được chấp nhận');
     return;
   }
 
@@ -453,7 +501,7 @@ async function handleScanSuccess(decodedText) {
   renderTable();
   updateRecentScanDisplay(qrKey, isNew, qrRecords[qrKey]);
 
-  // HIỂN THỊ POPUP THÔNG BÁO TO
+  // HIỂN THỊ POPUP THÔNG BÁO TO THÀNH CÔNG
   showResultModal(qrKey, isNew, qrRecords[qrKey]);
 }
 
@@ -468,17 +516,78 @@ function updateRecentScanDisplay(code, isNew, count) {
   }
 }
 
-// --- POPUP THÔNG BÁO TO KHI QUÉT XONG ---
-function showResultModal(code, isNew, count) {
+// --- POPUP THÔNG BÁO TO KHI BỊ LOẠI BỎ (ĐỎ) ---
+function showRejectedModal(code, reason) {
   const resultModal = document.getElementById('scanResultModal');
+  const cardEl = document.getElementById('modalResultCard');
+  const iconEl = document.getElementById('modalResultIcon');
+  const iconSuccess = document.getElementById('modalIconSuccess');
+  const iconError = document.getElementById('modalIconError');
+  const titleEl = document.getElementById('modalResultTitle');
+  const labelEl = document.getElementById('modalResultLabel');
   const textEl = document.getElementById('modalResultText');
   const statusEl = document.getElementById('modalResultStatus');
-  const qtyEl = document.getElementById('modalResultQty');
+  const countWrapper = document.getElementById('modalResultCountWrapper');
 
-  textEl.textContent = code;
-  statusEl.textContent = isNew ? 'MÃ MỚI (LẦN ĐẦU)' : 'MÃ TRÙNG (ĐÃ CỘNG DỒN)';
-  statusEl.className = `result-status ${isNew ? 'new' : 'repeat'}`;
-  qtyEl.textContent = count;
+  if (cardEl) cardEl.classList.add('is-rejected');
+  if (iconEl) iconEl.classList.add('error');
+  if (iconSuccess) iconSuccess.classList.add('d-none');
+  if (iconError) iconError.classList.remove('d-none');
+
+  if (titleEl) {
+    titleEl.textContent = 'MÃ BỊ LOẠI BỎ!';
+    titleEl.classList.add('error');
+  }
+  if (labelEl) labelEl.textContent = 'Đường link bị từ chối:';
+  if (textEl) {
+    textEl.textContent = code;
+    textEl.classList.add('error');
+  }
+  if (statusEl) {
+    statusEl.textContent = 'ĐÃ LOẠI BỎ (KHÔNG LƯU)';
+    statusEl.className = 'result-status rejected';
+  }
+  if (countWrapper) {
+    countWrapper.innerHTML = `<span style="color: var(--danger-color); font-weight: 600;">${reason || 'Không nhận đường link'}</span>`;
+  }
+
+  resultModal.classList.remove('d-none');
+}
+
+// --- POPUP THÔNG BÁO TO KHI QUÉT XONG HỢP LỆ (XANH) ---
+function showResultModal(code, isNew, count) {
+  const resultModal = document.getElementById('scanResultModal');
+  const cardEl = document.getElementById('modalResultCard');
+  const iconEl = document.getElementById('modalResultIcon');
+  const iconSuccess = document.getElementById('modalIconSuccess');
+  const iconError = document.getElementById('modalIconError');
+  const titleEl = document.getElementById('modalResultTitle');
+  const labelEl = document.getElementById('modalResultLabel');
+  const textEl = document.getElementById('modalResultText');
+  const statusEl = document.getElementById('modalResultStatus');
+  const countWrapper = document.getElementById('modalResultCountWrapper');
+
+  if (cardEl) cardEl.classList.remove('is-rejected');
+  if (iconEl) iconEl.classList.remove('error');
+  if (iconSuccess) iconSuccess.classList.remove('d-none');
+  if (iconError) iconError.classList.add('d-none');
+
+  if (titleEl) {
+    titleEl.textContent = 'QUÉT THÀNH CÔNG!';
+    titleEl.classList.remove('error');
+  }
+  if (labelEl) labelEl.textContent = 'Nội dung mã:';
+  if (textEl) {
+    textEl.textContent = code;
+    textEl.classList.remove('error');
+  }
+  if (statusEl) {
+    statusEl.textContent = isNew ? 'MÃ MỚI (LẦN ĐẦU)' : 'MÃ TRÙNG (ĐÃ CỘNG DỒN)';
+    statusEl.className = `result-status ${isNew ? 'new' : 'repeat'}`;
+  }
+  if (countWrapper) {
+    countWrapper.innerHTML = `Tổng số lượng: <strong id="modalResultQty">${count}</strong>`;
+  }
 
   resultModal.classList.remove('d-none');
 }

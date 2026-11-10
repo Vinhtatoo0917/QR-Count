@@ -223,21 +223,26 @@
     <div id="camAlert" class="fullscreen-alert d-none"></div>
   </div>
 
-  <!-- POPUP THÔNG BÁO TO KHI QUÉT THÀNH CÔNG -->
+  <!-- POPUP THÔNG BÁO TO KHI QUÉT THÀNH CÔNG / BỊ TỪ CHỐI -->
   <div id="scanResultModal" class="scan-result-modal d-none">
-    <div class="scan-result-card">
-      <div class="scan-result-icon">
-        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="3">
+    <div class="scan-result-card" id="modalResultCard">
+      <div class="scan-result-icon" id="modalResultIcon">
+        <svg id="modalIconSuccess" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="3">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
+        <svg id="modalIconError" class="d-none" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
       </div>
-      <h2 class="scan-result-title">QUÉT THÀNH CÔNG!</h2>
+      <h2 class="scan-result-title" id="modalResultTitle">QUÉT THÀNH CÔNG!</h2>
       <div class="scan-result-content">
-        <span class="result-label">Nội dung mã:</span>
+        <span class="result-label" id="modalResultLabel">Nội dung mã:</span>
         <div class="result-text" id="modalResultText"></div>
-        <div class="result-qty-box">
+        <div class="result-qty-box" id="modalResultQtyBox">
           <span class="result-status" id="modalResultStatus">MÃ MỚI</span>
-          <span class="result-count">Tổng số lượng: <strong id="modalResultQty">1</strong></span>
+          <span class="result-count" id="modalResultCountWrapper">Tổng số lượng: <strong id="modalResultQty">1</strong></span>
         </div>
       </div>
       <div class="scan-result-actions">

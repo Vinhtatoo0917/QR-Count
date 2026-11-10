@@ -407,7 +407,7 @@ body {
   z-index: 100002;
 }
 
-/* --- POPUP THÔNG BÁO TO KHI QUÉT THÀNH CÔNG --- */
+/* --- POPUP THÔNG BÁO TO KHI QUÉT THÀNH CÔNG / BỊ TỪ CHỐI --- */
 .scan-result-modal {
   position: fixed;
   top: 0;
@@ -440,6 +440,10 @@ body {
   animation: scaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.scan-result-card.is-rejected {
+  border-top: 5px solid var(--danger-color);
+}
+
 @keyframes scaleUp {
   from { transform: scale(0.85); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -455,6 +459,12 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto 16px auto;
+  transition: all 0.2s ease;
+}
+
+.scan-result-icon.error {
+  background-color: #fee2e2;
+  color: var(--danger-color);
 }
 
 .scan-result-title {
@@ -463,6 +473,10 @@ body {
   color: var(--text-main);
   letter-spacing: -0.5px;
   margin-bottom: 12px;
+}
+
+.scan-result-title.error {
+  color: var(--danger-color);
 }
 
 .scan-result-content {
@@ -491,6 +505,10 @@ body {
   margin: 6px 0 12px 0;
 }
 
+.result-text.error {
+  color: var(--danger-color);
+}
+
 .result-qty-box {
   display: flex;
   justify-content: space-between;
@@ -506,6 +524,11 @@ body {
   border-radius: 9999px;
   background-color: #dbeafe;
   color: #1d4ed8;
+}
+
+.result-status.rejected {
+  background-color: #fee2e2;
+  color: #b91c1c;
 }
 
 .result-count {
