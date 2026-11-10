@@ -591,27 +591,57 @@ function saveEditModal() {
   closeEditModal();
 }
 
-// --- XUẤT CSV CHO EXCEL & TỰ ĐỘNG BẬT MENU CHIA SẺ (WEB SHARE API) ---
+// --- XUẤT EXCEL (.XLSX) & TỰ ĐỘNG BẬT MENU CHIA SẺ (WEB SHARE API) ---
 async function exportToCSV() {
   const keys = Object.keys(qrRecords);
   if (keys.length === 0) {
-    alert('Chưa có dữ liệu để xuất file CSV.');
+    alert('Chưa có dữ liệu để xuất file Excel.');
     return;
   }
 
-  // Tiêu đề UTF-8 BOM để Excel hiển thị đúng tiếng Việt
-  let csvContent = '\uFEFF';
-  csvContent += '"DỮ LIỆU QR","SỐ LƯỢNG"\r\n';
-
-  keys.forEach(key => {
-    const escapedValue = key.replace(/"/g, '""');
-    csvContent += `"${escapedValue}",${qrRecords[key]}\r\n`;
-  });
-
   const timestamp = new Date().toISOString().slice(0, 10);
-  const fileName = `QR_Count_${timestamp}.csv`;
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const file = new File([blob], fileName, { type: 'text/csv;charset=utf-8;' });
+  const fileName = `QR_Count_${timestamp}.xlsx`;
+
+  let blob = null;
+  let file = null;
+
+  // Sử dụng SheetJS nếu khả dụng để tạo file Excel (.xlsx) chuẩn
+  if (typeof XLSX !== 'undefined') {
+    const wsData = [
+      ['DỮ LIỆU QR', 'SỐ LƯỢNG']
+    ];
+
+    keys.forEach(key => {
+      wsData.push([key, qrRecords[key]]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Cài đặt độ rộng cột cho đẹp mắt
+    ws['!cols'] = [
+      { wch: 35 }, // DỮ LIỆU QR
+      { wch: 15 }  // SỐ LƯỢNG
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'ThongKeQR');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    blob = new Blob([wbout], { type: mimeType });
+    file = new File([blob], fileName, { type: mimeType });
+  } else {
+    // Dự phòng (fallback) nếu không có mạng hoặc SheetJS chưa tải xong: xuất CSV UTF-8
+    let csvContent = '\uFEFF';
+    csvContent += '"DỮ LIỆU QR","SỐ LƯỢNG"\r\n';
+    keys.forEach(key => {
+      const escapedValue = key.replace(/"/g, '""');
+      csvContent += `"${escapedValue}",${qrRecords[key]}\r\n`;
+    });
+    const fallbackName = `QR_Count_${timestamp}.csv`;
+    blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    file = new File([blob], fallbackName, { type: 'text/csv;charset=utf-8;' });
+  }
 
   // 1. Tự động kích hoạt menu chia sẻ của điện thoại (Zalo, Drive, Gmail, v.v.)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -635,14 +665,14 @@ async function exportToCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = fileName;
+  a.download = file.name || fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// --- NHẬP LẠI DỮ LIỆU TỪ FILE EXCEL (CSV) ---
+// --- NHẬP LẠI DỮ LIỆU TỪ FILE EXCEL (.XLSX / .XLS / .CSV) ---
 function parseCSV(text) {
   // Loại bỏ BOM nếu có
   if (text.charCodeAt(0) === 0xFEFF) {
@@ -702,45 +732,103 @@ function parseCSV(text) {
   return result;
 }
 
+function parseWorkbook(wb) {
+  const firstSheetName = wb.SheetNames[0];
+  const worksheet = wb.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+  const result = {};
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+
+    const col0 = row[0] ? String(row[0]).trim() : '';
+    const col1 = row[1] !== undefined ? String(row[1]).trim() : '';
+
+    // Bỏ qua tiêu đề
+    if (i === 0 && (col0.includes('DỮ LIỆU') || col0.includes('SỐ LƯỢNG') || col0.toLowerCase().includes('qr'))) {
+      continue;
+    }
+
+    if (col0 && col1) {
+      const qty = parseInt(col1, 10);
+      if (!isNaN(qty) && qty > 0) {
+        result[col0] = (result[col0] || 0) + qty;
+      } else {
+        result[col0] = (result[col0] || 0) + 1;
+      }
+    } else if (col0) {
+      result[col0] = (result[col0] || 0) + 1;
+    }
+  }
+
+  return result;
+}
+
 function handleImportCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const text = e.target.result;
-      const data = parseCSV(text);
-      const keys = Object.keys(data);
+  const fileName = file.name.toLowerCase();
+  const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
 
-      if (keys.length === 0) {
-        throw new Error('Không tìm thấy dữ liệu hợp lệ trong file Excel CSV.');
-      }
-
-      const merge = confirm(`Tìm thấy ${keys.length} loại mã trong file Excel.\n\nBạn muốn GỘP vào danh sách hiện tại?\n- Bấm "OK" để GỘP (cộng dồn số lượng).\n- Bấm "Cancel" để GHI ĐÈ thay thế danh sách cũ.`);
-
-      if (merge) {
-        for (const [k, v] of Object.entries(data)) {
-          qrRecords[k] = (qrRecords[k] || 0) + v;
-        }
-      } else {
-        qrRecords = {};
-        for (const [k, v] of Object.entries(data)) {
-          qrRecords[k] = v;
-        }
-      }
-
-      saveData();
-      renderTable();
-      alert(`Đã nhập thành công ${keys.length} mã từ file Excel!`);
-    } catch (err) {
-      console.error(err);
-      alert('Lỗi khi đọc file Excel CSV: ' + err.message);
-    } finally {
-      event.target.value = '';
+  const processData = (data) => {
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+      throw new Error('Không tìm thấy dữ liệu hợp lệ trong file Excel.');
     }
+
+    const merge = confirm(`Tìm thấy ${keys.length} loại mã trong file Excel.\n\nBạn muốn GỘP vào danh sách hiện tại?\n- Bấm "OK" để GỘP (cộng dồn số lượng).\n- Bấm "Cancel" để GHI ĐÈ thay thế danh sách cũ.`);
+
+    if (merge) {
+      for (const [k, v] of Object.entries(data)) {
+        qrRecords[k] = (qrRecords[k] || 0) + v;
+      }
+    } else {
+      qrRecords = {};
+      for (const [k, v] of Object.entries(data)) {
+        qrRecords[k] = v;
+      }
+    }
+
+    saveData();
+    renderTable();
+    alert(`Đã nhập thành công ${keys.length} mã từ file Excel!`);
   };
-  reader.readAsText(file, 'utf-8');
+
+  const reader = new FileReader();
+
+  if (isExcel && typeof XLSX !== 'undefined') {
+    reader.onload = function (e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const parsed = parseWorkbook(wb);
+        processData(parsed);
+      } catch (err) {
+        console.error(err);
+        alert('Lỗi khi đọc file Excel (.xlsx): ' + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // Xử lý CSV
+    reader.onload = function (e) {
+      try {
+        const text = e.target.result;
+        const data = parseCSV(text);
+        processData(data);
+      } catch (err) {
+        console.error(err);
+        alert('Lỗi khi đọc file CSV: ' + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
 }
 
 // --- SAO LƯU & NHẬP JSON ---

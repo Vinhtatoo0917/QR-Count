@@ -11,13 +11,15 @@
   <!-- Cấu hình Progressive Web App (PWA) có biểu tượng App riêng trên iOS và Android -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
-  
+
   <!-- Biểu tượng app cho iPhone / iPad (Mở trực tiếp trên Safari để giữ quyền Camera vĩnh viễn) -->
   <meta name="apple-mobile-web-app-title" content="QR Count">
   <link rel="apple-touch-icon" href="icon.svg">
 
   <!-- Thư viện quét mã QR siêu nhẹ -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- Thư viện xử lý xuất/nhập Excel (.xlsx) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -93,23 +95,25 @@
         </div>
 
         <div class="action-buttons">
-          <button id="btnExportCSV" class="btn btn-action" title="Xuất file CSV cho Excel">
+          <button id="btnExportCSV" class="btn btn-action" title="Xuất file Excel (.xlsx)">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Xuất Excel (CSV)
+            Xuất Excel (.xlsx)
           </button>
-          <button id="btnImportCSV" class="btn btn-action" title="Nhập lại dữ liệu từ file Excel CSV">
+          <button id="btnImportCSV" class="btn btn-action" title="Nhập lại dữ liệu từ file Excel (.xlsx / .csv)">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            Nhập Excel (CSV)
+            Nhập Excel
           </button>
-          <input type="file" id="fileInputCSV" accept=".csv, text/csv" class="d-none">
+          <input type="file" id="fileInputCSV"
+            accept=".xlsx, .xls, .csv, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            class="d-none">
           <button id="btnExportJSON" class="btn btn-action" title="Sao lưu dữ liệu JSON">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
