@@ -608,7 +608,7 @@ async function exportToCSV() {
   // Sử dụng SheetJS nếu khả dụng để tạo file Excel (.xlsx) chuẩn
   if (typeof XLSX !== 'undefined') {
     const wsData = [
-      ['DỮ LIỆU QR', 'SỐ LƯỢNG']
+      ['MÃ SẢN PHẨM/ TÊN SẢN PHẨM', 'SỐ LƯỢNG TEM CẦN IN']
     ];
 
     keys.forEach(key => {
@@ -620,8 +620,8 @@ async function exportToCSV() {
 
     // Cài đặt độ rộng cột cho đẹp mắt
     ws['!cols'] = [
-      { wch: 35 }, // DỮ LIỆU QR
-      { wch: 15 }  // SỐ LƯỢNG
+      { wch: 38 }, // MÃ SẢN PHẨM/ TÊN SẢN PHẨM
+      { wch: 26 }  // SỐ LƯỢNG TEM CẦN IN
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, 'ThongKeQR');
@@ -633,7 +633,7 @@ async function exportToCSV() {
   } else {
     // Dự phòng (fallback) nếu không có mạng hoặc SheetJS chưa tải xong: xuất CSV UTF-8
     let csvContent = '\uFEFF';
-    csvContent += '"DỮ LIỆU QR","SỐ LƯỢNG"\r\n';
+    csvContent += '"MÃ SẢN PHẨM/ TÊN SẢN PHẨM","SỐ LƯỢNG TEM CẦN IN"\r\n';
     keys.forEach(key => {
       const escapedValue = key.replace(/"/g, '""');
       csvContent += `"${escapedValue}",${qrRecords[key]}\r\n`;
@@ -687,7 +687,7 @@ function parseCSV(text) {
     if (!line) continue;
 
     // Bỏ qua dòng tiêu đề nếu có
-    if (i === 0 && (line.includes('DỮ LIỆU') || line.includes('SỐ LƯỢNG') || line.toLowerCase().includes('qr'))) {
+    if (i === 0 && (line.includes('MÃ SẢN PHẨM') || line.includes('SỐ LƯỢNG') || line.includes('DỮ LIỆU') || line.toLowerCase().includes('qr'))) {
       continue;
     }
 
@@ -746,7 +746,7 @@ function parseWorkbook(wb) {
     const col1 = row[1] !== undefined ? String(row[1]).trim() : '';
 
     // Bỏ qua tiêu đề
-    if (i === 0 && (col0.includes('DỮ LIỆU') || col0.includes('SỐ LƯỢNG') || col0.toLowerCase().includes('qr'))) {
+    if (i === 0 && (col0.includes('MÃ SẢN PHẨM') || col0.includes('DỮ LIỆU') || col0.includes('SỐ LƯỢNG') || col0.toLowerCase().includes('qr'))) {
       continue;
     }
 

@@ -1,4 +1,4 @@
-# Ứng Dụng Quét Mã QR & Đếm Số Lượng (QR Counter)
+﻿# Ứng Dụng Quét Mã QR & Đếm Số Lượng (QR Counter)
 
 Hệ thống web quét mã QR và tự động thống kê số lượng được phát triển bằng HTML5, CSS3 và Vanilla JavaScript thuần, hoạt động hoàn toàn phía trình duyệt (Client-side) mà không cần backend hay database server.
 
@@ -28,7 +28,7 @@ Hệ thống web quét mã QR và tự động thống kê số lượng đượ
 
 4. **Lưu trữ & Sao lưu**:
    - Tự động lưu vào `LocalStorage` của trình duyệt ngay lập tức. Tải lại trang không bị mất dữ liệu.
-   - **Xuất CSV**: Tương thích hoàn toàn với Microsoft Excel (hỗ trợ UTF-8 BOM hiển thị chuẩn tiếng Việt).
+   - **Xuất & Nhập Excel (.xlsx)**: Xuất và nhập trực tiếp định dạng Excel chuẩn (.xlsx), tương thích hoàn toàn với Microsoft Excel, Google Sheets.
    - **Sao lưu & Khôi phục JSON**: Cho phép tải file cấu hình về máy hoặc nhập lại file JSON (có tùy chọn cộng dồn hoặc ghi đè).
 
 5. **Giao diện & Hiệu năng**:
